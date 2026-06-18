@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Puyo Puyo Prototype - No Gaps</title>
+    <style>
+        /* 全体レイアウト：極上のゲームセンター風ダークネオンテーマ */
+        body {
+            margin: 0;
+            padding: 0;
+            background: radial-gradient(circle at center, #141622 0%, #07080c 100%);
+            color: #f1f5f9;
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        h1 {
+            font-size: 32px;
+            font-weight: 900;
+            margin: 0 0 20px 0;
+            letter-spacing: 6px;
+            text-transform: uppercase;
+            text-align: center;
+            background: linear-gradient(135deg, #00ffcc 0%, #00bcff 50%, #8b5cf6 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            filter: drop-shadow(0 2px 10px rgba(0, 255, 204, 0.4));
+        }
+
+        /* ゲームコンテナ：高級感のあるシールドガラスデザイン */
+        #game-container {
+            display: flex;
+            gap: 28px;
+            background: rgba(22, 24, 37, 0.9);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            padding: 24px;
+            border-radius: 24px;
+            box-shadow: 0 25px 60px rgba(0, 0, 0, 0.8),
+                        inset 0 1px 0 rgba(255, 255, 255, 0.1),
+                        0 0 40px rgba(0, 188, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        /* キャンバス：視認性を極限まで高めた漆黒のプレイエリア */
+        canvas#gameCanvas {
+            background: linear-gradient(180deg, #05060a 0%, #0a0c16 100%);
+            border-radius: 16px;
+            box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.05),
+                        0 10px 30px rgba(0, 0, 0, 0.7),
+                        0 0 30px rgba(0, 255, 204, 0.1);
+            border: 3px solid #1e293b;
+        }
+
+        /* サイドバー：情報パネルの配置調整 */
+        #sidebar {
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            width: 150px;
+        }
+
+        /* パネル：情報ごとの独立したSF風ネオンカード */
+        .panel {
+            background: rgba(10, 11, 18, 0.85);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 16px;
+            padding: 16px;
+            margin-bottom: 18px;
+            text-align: center;
+            box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.5),
+                        0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+
+        .panel-title {
+            font-size: 11px;
+            font-weight: 800;
+            color: #64748b;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+            letter-spacing: 2px;
+        }
+
+        .panel-value {
+            font-size: 28px;
+            font-weight: 900;
+            color: #00ffcc;
+            font-family: 'SF Pro Display', -apple-system, monospace;
+            text-shadow: 0 0 12px rgba(0, 255, 204, 0.6);
+        }
+
+        /* 操作説明デザインのクオリティ向上 */
+        .controls-info {
+            font-size: 11px;
+            color: #94a3b8;
+            text-align: left;
+            line-height: 2.0;
+        }
+
+        .controls-info p {
+            margin: 8px 0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .controls-info p span {
+            color: #cbd5e1;
+            font-weight: 500;
+        }
+
+        .controls-info key {
+            background: linear-gradient(180deg, #334155 0%, #1e293b 100%);
+            border: 1px solid #475569;
+            border-radius: 6px;
+            padding: 2px 8px;
+            font-family: inherit;
+            font-weight: 800;
+            color: #ffffff;
+            box-shadow: 0 3px 0 #0f172a, 0 4px 8px rgba(0,0,0,0.4);
+            min-width: 24px;
+            text-align: center;
+            display: inline-block;
+        }
+
+        .notice {
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px dashed rgba(255, 255, 255, 0.08);
+            font-size: 10px;
+            color: #38bdf8;
+            line-height: 1.5;
+            font-weight: 500;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>PUYO FALL PROTOTYPE</h1>
+
+    <div id="game-container">
+        <!-- メインゲーム画面（ブロックサイズ40px換算で 240x480 ） -->
+        <canvas id="gameCanvas" width="240" height="480"></canvas>
+
+        <!-- サイド情報パネル -->
+        <div id="sidebar">
+            <div>
+                <div class="panel">
+                    <div class="panel-title">Score</div>
+                    <div id="score" class="panel-value">0</div>
+                </div>
+                <div class="panel">
+                    <div class="panel-title">Next</div>
+                    <!-- 次のぷよを描画するミニキャンバス -->
+                    <canvas id="nextCanvas" width="80" height="130" style="background-color: #05060a; border-radius: 12px; border: 1px solid rgba(255,255,255,0.05); margin-top: 6px;"></canvas>
+                </div>
+            </div>
+
+            <div class="panel" style="margin-bottom: 0;">
+                <div class="panel-title">Controls</div>
+                <div class="controls-info">
+                    <p><span>左移動</span><key>←</key></p>
+                    <p><span>右移動</span><key>→</key></p>
+                    <p><span>高速落下</span><key>↓</key></p>
+                    <p><span>右回転</span><key>↑</key></p>
+                    <p><span style="padding-left: 20px;">または</span><key>Space</key></p>
+                    <div class="notice">
+                        ぷよ同士の隙間をなくし、より快適で一体感のあるグラフィックになりました！
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ==========================================
+        // 定数・ゲーム設定
+        // ==========================================
+        const COLS = 6;      
+        const ROWS = 12;     
+        const BLOCK_SIZE = 40; 
+
+        // ぷよの色定義（輝度と彩度をさらに高めたユニバーサルデザイン調カラー）
+        const COLORS = {
+            0: 'transparent', 
+            1: '#ff4d4d',     // 鮮明で明るいネオンレッド
+            2: '#3b82f6',     // 深みと明るさを両立した美発色のブルー
+            3: '#10b981',     // 視認性抜群のエメラルドグリーン
+            4: '#eab308'      // くっきり目立つゴールデンイエロー
+        };
+
+        // 輪郭および底部のシャドウ用カラー
+        const STROKE_COLORS = {
+            1: '#991b1b',
+            2: '#1d4ed8',
+            3: '#065f46',
+            4: '#a16207'
+        };
+
+        // ==========================================
+        // ゲーム状態変数
+        // ==========================================
+        let canvas, ctx;
+        let nextCanvas, nextCtx;
+        let field = [];
+
+        // 現在操作中のぷよペア
+        let currentGroup = {
+            x: 2,         
+            y: -1.0,      
+            puyos: [
+                { color: 1, relX: 0, relY: 0 },  // 軸ぷよ (中心)
+                { color: 2, relX: 0, relY: -1 }  // 伴ぷよ (初期値は上)
+            ]
+        };
+
+        // 次に登場するぷよペア
+        let nextGroup = {
+            puyos: [
+                { color: 1 },
+                { color: 2 }
+            ]
+        };
+
+        // 落下速度管理
+        let fallSpeed = 0.03;      
+        const normalSpeed = 0.03;
+        const fastSpeed = 0.35;     
+
+        // キー入力状態
+        let keys = {
+            left: false,
+            right: false,
+            down: false
+        };
+
+        // キーリピート管理
+        let leftPressedTime = 0;
+        let rightPressedTime = 0;
+        const KEY_REPEAT_DELAY = 8;    
+        const KEY_REPEAT_INTERVAL = 3;  
+
+        // ==========================================
+        // 初期化処理
+        // ==========================================
+        window.onload = function() {
+            canvas = document.getElementById('gameCanvas');
+            ctx = canvas.getContext('2d');
+            nextCanvas = document.getElementById('nextCanvas');
+            nextCtx = nextCanvas.getContext('2d');
+
+            initField();
+            generateNextGroup();
+            spawnPuyo();
+
+            window.addEventListener('keydown', handleKeyDown);
+            window.addEventListener('keyup', handleKeyUp);
+
+            requestAnimationFrame(gameLoop);
+        };
+
+        function initField() {
+            field = [];
+            for (let r = 0; r < ROWS; r++) {
+                field[r] = [];
+                for (let c = 0; c < COLS; c++) {
+                    field[r][c] = 0;
+                }
+            }
+        }
+
+        function getRandomColor() {
+            return Math.floor(Math.random() * 4) + 1;
+        }
+
+        function generateNextGroup() {
+            nextGroup.puyos[0].color = getRandomColor();
+            nextGroup.puyos[1].color = getRandomColor();
+        }
+
+        function spawnPuyo() {
+            currentGroup.x = 2; 
+            currentGroup.y = 0.0; 
+
+            currentGroup.puyos[0].color = nextGroup.puyos[0].color;
+            currentGroup.puyos[0].relX = 0;
+            currentGroup.puyos[0].relY = 0;
+
+            currentGroup.puyos[1].color = nextGroup.puyos[1].color;
+            currentGroup.puyos[1].relX = 0;
+            currentGroup.puyos[1].relY = -1;
+
+            generateNextGroup();
+
+            if (checkCollision(currentGroup.x, 0)) {
+                initField(); 
+            }
+        }
+
+        // ==========================================
+        // 入力処理（キーボード）
+        // ==========================================
+        function handleKeyDown(e) {
+            if (e.key === 'ArrowLeft') {
+                keys.left = true;
+                if (leftPressedTime === 0) {
+                    tryMove(-1);
+                }
+            }
+            if (e.key === 'ArrowRight') {
+                keys.right = true;
+                if (rightPressedTime === 0) {
+                    tryMove(1);
+                }
+            }
+            if (e.key === 'ArrowDown') {
+                keys.down = true;
+            }
+            if ((e.key === 'ArrowUp' || e.key === ' ') && !e.repeat) {
+                e.preventDefault(); 
+                rotateGroup();
+            }
+        }
+
+        function handleKeyUp(e) {
+            if (e.key === 'ArrowLeft') {
+                keys.left = false;
+                leftPressedTime = 0;
+            }
+            if (e.key === 'ArrowRight') {
+                keys.right = false;
+                rightPressedTime = 0;
+            }
+            if (e.key === 'ArrowDown') {
+                keys.down = false;
+            }
+        }
+
+        function tryMove(dx) {
+            let nextX = currentGroup.x + dx;
+            if (!checkCollision(nextX, currentGroup.y)) {
+                currentGroup.x = nextX;
+                return true;
+            }
+            return false;
+        }
+
+        function processContinuousInput() {
+            if (keys.left) {
+                leftPressedTime++;
+                if (leftPressedTime > KEY_REPEAT_DELAY && (leftPressedTime - KEY_REPEAT_DELAY) % KEY_REPEAT_INTERVAL === 0) {
+                    tryMove(-1);
+                }
+            }
+            if (keys.right) {
+                rightPressedTime++;
+                if (rightPressedTime > KEY_REPEAT_DELAY && (rightPressedTime - KEY_REPEAT_DELAY) % KEY_REPEAT_INTERVAL === 0) {
+                    tryMove(1);
+                }
+            }
+        }
+
+        // ==========================================
+        // 回転処理（壁蹴り付き）
+        // ==========================================
+        function rotateGroup() {
+            const axis = currentGroup.puyos[0]; 
+            const partner = currentGroup.puyos[1]; 
+
+            const nextRelX = -partner.relY;
+            const nextRelY = partner.relX;
+
+            let tempGroup = {
+                x: currentGroup.x,
+                y: currentGroup.y,
+                puyos: [
+                    { relX: axis.relX, relY: axis.relY },
+                    { relX: nextRelX, relY: nextRelY }
+                ]
+            };
+
+            const kickOffsets = [
+                { dx: 0, dy: 0 },
+                { dx: -1, dy: 0 },
+                { dx: 1, dy: 0 },
+                { dx: 0, dy: -1 }
+            ];
+
+            for (let offset of kickOffsets) {
+                let testX = tempGroup.x + offset.dx;
+                let testY = tempGroup.y + offset.dy;
+
+                if (!checkCollisionWithTemp(testX, testY, tempGroup.puyos)) {
+                    currentGroup.x = testX;
+                    currentGroup.y = testY;
+                    partner.relX = nextRelX;
+                    partner.relY = nextRelY;
+                    break; 
+                }
+            }
+        }
+
+        function checkCollisionWithTemp(targetX, targetY, tempPuyos) {
+            for (let puyo of tempPuyos) {
+                let gridX = targetX + puyo.relX;
+                let gridY = Math.ceil(targetY + puyo.relY);
+
+                if (gridX < 0 || gridX >= COLS) return true;
+                if (gridY >= ROWS) return true;
+
+                if (gridY >= 0) {
+                    if (field[gridY][gridX] !== 0) return true;
+                }
+            }
+            return false;
+        }
+
+        // ==========================================
+        // 衝突判定
+        // ==========================================
+        function checkCollision(targetX, targetY) {
+            for (let puyo of currentGroup.puyos) {
+                let gridX = targetX + puyo.relX;
+                let gridY = Math.ceil(targetY + puyo.relY);
+
+                if (gridX < 0 || gridX >= COLS) return true;
+                if (gridY >= ROWS) return true;
+
+                if (gridY >= 0) {
+                    if (field[gridY][gridX] !== 0) return true;
+                }
+            }
+            return false;
+        }
+
+        function lockPuyos() {
+            for (let puyo of currentGroup.puyos) {
+                let gridX = currentGroup.x + puyo.relX;
+                let gridY = Math.floor(currentGroup.y + puyo.relY);
+
+                if (gridY >= 0 && gridY < ROWS && gridX >= 0 && gridX < COLS) {
+                    field[gridY][gridX] = puyo.color;
+                }
+            }
+            spawnPuyo();
+        }
+
+        // ==========================================
+        // アップデート
+        // ==========================================
+        function update() {
+            processContinuousInput();
+            fallSpeed = keys.down ? fastSpeed : normalSpeed;
+            let nextY = currentGroup.y + fallSpeed;
+
+            if (checkCollision(currentGroup.x, nextY)) {
+                lockPuyos();
+            } else {
+                currentGroup.y = nextY;
+            }
+        }
+
+        // ==========================================
+        // 描画処理
+        // ==========================================
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // フィールド内の繊細なグリッド線（明るさを最適化し、プレイを邪魔しない）
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.04)';
+            ctx.lineWidth = 1;
+            for (let i = 1; i < COLS; i++) {
+                ctx.beginPath();
+                ctx.moveTo(i * BLOCK_SIZE, 0);
+                ctx.lineTo(i * BLOCK_SIZE, canvas.height);
+                ctx.stroke();
+            }
+            for (let j = 1; j < ROWS; j++) {
+                ctx.beginPath();
+                ctx.moveTo(0, j * BLOCK_SIZE);
+                ctx.lineTo(canvas.width, j * BLOCK_SIZE);
+                ctx.stroke();
+            }
+
+            // 固定されているぷよの描画
+            for (let r = 0; r < ROWS; r++) {
+                for (let c = 0; c < COLS; c++) {
+                    if (field[r][c] !== 0) {
+                        drawSinglePuyo(ctx, c * BLOCK_SIZE, r * BLOCK_SIZE, field[r][c]);
+                    }
+                }
+            }
+
+            // 現在操作中のぷよの描画
+            for (let puyo of currentGroup.puyos) {
+                let drawX = (currentGroup.x + puyo.relX) * BLOCK_SIZE;
+                let drawY = (currentGroup.y + puyo.relY) * BLOCK_SIZE;
+                drawSinglePuyo(ctx, drawX, drawY, puyo.color);
+            }
+
+            drawNextPuyos();
+        }
+
+        // 「ぷよ」の描画（隙間をゼロにして密着させる新設計）
+        function drawSinglePuyo(context, x, y, colorId) {
+            if (colorId === 0) return;
+
+            // 隙間（gap）を完全に0にし、グリッド枠にピッタリ合わせる
+            const radius = BLOCK_SIZE / 2; 
+            const centerX = x + BLOCK_SIZE / 2;
+            const centerY = y + BLOCK_SIZE / 2;
+
+            context.save();
+
+            // 超高精細グラデーション
+            let gradient = context.createRadialGradient(
+                centerX - radius/2.5, centerY - radius/2.5, radius/12,
+                centerX, centerY, radius
+            );
+            gradient.addColorStop(0, '#ffffff'); // 超強力なハイライト
+            gradient.addColorStop(0.2, COLORS[colorId]);
+            gradient.addColorStop(0.8, STROKE_COLORS[colorId]);
+            gradient.addColorStop(1, 'rgba(0, 0, 0, 0.6)'); // フチの影
+
+            context.beginPath();
+            // 隙間を開けないため、完全な円（ellipseではなくarc等と同等）で描画
+            context.arc(centerX, centerY, radius, 0, Math.PI * 2);
+            context.fillStyle = gradient;
+            context.fill();
+
+            // クッキリとしたフチ取り線（重ね合わさった時に綺麗に見えるように）
+            context.strokeStyle = 'rgba(0, 0, 0, 0.5)';
+            context.lineWidth = 1.5;
+            context.stroke();
+
+            // 「ぷよ」の目を描く（白目と黒目のハイライトをさらにクッキリと）
+            drawPuyoEyes(context, centerX, centerY, radius);
+
+            context.restore();
+        }
+
+        // 愛らしく超見やすい白目と黒目のハイライト描画
+        function drawPuyoEyes(context, cx, cy, r) {
+            const eyeSpacing = r * 0.33; 
+            const eyeYOffset = -r * 0.12; 
+            const eyeRadiusX = r * 0.15; 
+            const eyeRadiusY = r * 0.23; 
+
+            [-1, 1].forEach(side => {
+                const ex = cx + side * eyeSpacing;
+                const ey = cy + eyeYOffset;
+
+                // 1. 白目（輪郭線を引いてハッキリ見せる）
+                context.beginPath();
+                context.ellipse(ex, ey, eyeRadiusX, eyeRadiusY, 0, 0, Math.PI * 2);
+                context.fillStyle = '#ffffff';
+                context.fill();
+                context.strokeStyle = 'rgba(0, 0, 0, 0.8)';
+                context.lineWidth = 1.5;
+                context.stroke();
+
+                // 2. 黒目（少し寄り目にしてより可愛らしく）
+                context.beginPath();
+                const pupilX = ex - side * (eyeRadiusX * 0.28);
+                const pupilY = ey + (eyeRadiusY * 0.15);
+                context.arc(pupilX, pupilY, eyeRadiusX * 0.72, 0, Math.PI * 2);
+                context.fillStyle = '#0a0d14';
+                context.fill();
+
+                // 3. 黒目の中のうるうるハイライト（白目を際立たせる）
+                context.beginPath();
+                context.arc(pupilX - 0.6, pupilY - 0.6, 1.0, 0, Math.PI * 2);
+                context.fillStyle = '#ffffff';
+                context.fill();
+            });
+        }
+
+        // ネクストエリアの描画
+        function drawNextPuyos() {
+            nextCtx.clearRect(0, 0, nextCanvas.width, nextCanvas.height);
+
+            const startY = 25;
+            const size = 32; 
+
+            nextCtx.save();
+            nextCtx.scale(size / BLOCK_SIZE, size / BLOCK_SIZE);
+
+            // 軸ぷよ（下）
+            drawSinglePuyo(nextCtx, (nextCanvas.width/2 - size/2) * (BLOCK_SIZE/size), (startY + size) * (BLOCK_SIZE/size), nextGroup.puyos[0].color);
+            // 伴ぷよ（上）
+            drawSinglePuyo(nextCtx, (nextCanvas.width/2 - size/2) * (BLOCK_SIZE/size), startY * (BLOCK_SIZE/size), nextGroup.puyos[1].color);
+
+            nextCtx.restore();
+        }
+
+        // ==========================================
+        // ループ
+        // ==========================================
+        function gameLoop() {
+            update();
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+    </script>
+</body>
+</html>
